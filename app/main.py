@@ -4,6 +4,8 @@ import json
 import boto3
 import streamlit as st
 
+bucket_name = "learn-smart-rag"
+
 ## We will be suing Titan Embeddings Model To generate Embedding
 
 from langchain_community.embeddings import BedrockEmbeddings
