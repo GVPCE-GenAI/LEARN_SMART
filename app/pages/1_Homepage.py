@@ -10,7 +10,10 @@ accessToken = url.split('access_token=')[1].split('&')[0]
 
 # print(f"\n\n\n\n\n\{accessToken}\n\n\n\n\n")
 
-st.write(accessToken)
+# st.write(accessToken)
+appClientID = "72011ciu7lf2an6ftbd6ori7ns"
+userPoolID = "us-east-1_pn9fHLif2"
+
 # accessTokenObj = paramsList[-3]
 # accessToken = accessTokenObj.split('=')[1]
 
@@ -20,8 +23,8 @@ response = client.get_user(
     AccessToken = accessToken
 )
 
-userName = response['Username']
+# userName = response['Username']
 
 
-accessToken = st.query_params.get_all('access_token')
-st.write(accessToken)
+# accessToken = st.query_params.get_all('access_token')
+# st.write(accessToken)
