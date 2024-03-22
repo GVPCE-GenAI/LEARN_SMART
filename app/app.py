@@ -80,6 +80,8 @@ Question: {question}
 
 Assistant:"""
 
+# system_prompt = """You are an expert in the domains of Natural Language Processing, Langchain, Large Language Models, and Anthropic Claude Haiku, you need to answer the question from the user in a concise and relevant manner."""
+
 PROMPT = PromptTemplate(
     template=prompt_template, input_variables=["context", "question"]
 )
