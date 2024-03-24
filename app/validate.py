@@ -30,7 +30,7 @@ class Validate():
 
 
     # Function to call both email and password validation functions
-    def validate_details(self) -> str:
+    def validate_details(self) -> bool:
         if not self.validate_email():
             st.warning('Username must be an email address only!!', icon="⚠️")
             return False

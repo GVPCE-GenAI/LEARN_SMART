@@ -1,4 +1,5 @@
 import os
+import time
 import boto3
 import dotenv
 import streamlit as st
@@ -22,6 +23,7 @@ st.markdown(
 st.session_state['username'] = ''
 
 
+# Function to Sign_Up the user
 def sign_up_user(clientID, region_name, username, password, email) -> bool:
     try:
         client = boto3.client('cognito-idp', region_name = region_name)
@@ -29,15 +31,20 @@ def sign_up_user(clientID, region_name, username, password, email) -> bool:
             ClientId = clientID,
             Username = username,
             Password = password,
+            UserAttributes = [
+                {
+                    'Name' : 'email',
+                    'Value': email
+                },
+            ],
         )
-        # st.write(response)
         return True
     except Exception as e:
-        if e.response["Error"]["Code"] == "UsernameExistsException":
-            st.warning("User already exists!!!")
-        else:
-            st.warning("Couldn't complete process, stopping...")
-            # st.rerun()
+        if "UsernameExistsException" in str(e):
+            st.warning("User already exists!!")
+        st.warning("Couldn't complete process, Do it again...")
+        time.sleep(5)
+        st.switch_page("pages/2_Signup.py")
         return False
         
 
@@ -49,7 +56,6 @@ def main():
     APP_CLIENT_ID = os.getenv("APP_CLIENT_ID")
     USER_POOL_ID = os.getenv("USER_POOL_ID")
     USER_POOL_REGION = os.getenv("USER_POOL_REGION")
-    # print(USER_POOL_REGION)
 
     client = boto3.client('cognito-idp', region_name='us-east-1')
     # Login Form
@@ -60,8 +66,8 @@ def main():
         st.session_state['username'] = username
 
         # Input for password
-        st.write("Password: must be:\n1. Minimum of 8 characters.\n2. Must have atleast 1 Uppercase Letter.\n3. Must have atleast 1 lowercase letter.\n4. Must have atleast 1 digit.\n5. Must have atleast 1 special character")
-        password = st.text_input(label="Password", placeholder="Abcde@#$123", label_visibility="collapsed")
+        st.write("Password, must be:\n1. Minimum of 8 characters.\n2. Must have atleast 1 Uppercase Letter.\n3. Must have atleast 1 lowercase letter.\n4. Must have atleast 1 digit.\n5. Must have atleast 1 special character")
+        password = st.text_input(label="Password", placeholder="Abcde@#$123", label_visibility="collapsed", type="password")
 
         # Submit button
         submitted = st.form_submit_button("Submit")
@@ -69,7 +75,7 @@ def main():
             validate_obj = Validate(username, password)
             if validate_obj.validate_details():
                 if sign_up_user(APP_CLIENT_ID, USER_POOL_REGION, username, password, username):
-                    st.page_link("pages/3_Verify.py")
+                    st.switch_page("pages/3_Verify.py")
                     
 
 

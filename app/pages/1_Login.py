@@ -1,4 +1,5 @@
 import os
+import time
 import boto3
 import dotenv
 import streamlit as st
@@ -40,7 +41,8 @@ def sign_in_user(userpool_id, app_client_id, region_name, username, password) ->
         return True
     except Exception as e:
         st.warning("Username or Password is incorrect!\nTry again")
-        return False
+        time.sleep(5)
+        st.switch_page("pages/1_Login.py")
 
 def main():
     # Loading the environment variables.
@@ -59,7 +61,7 @@ def main():
 
         # Input for password
         st.write("Password:")
-        password = st.text_input(label="Password", placeholder="Abcde@#$123", label_visibility="collapsed")
+        password = st.text_input(label="Password", placeholder="Abcde@#$123", label_visibility="collapsed", type="password")
         st.session_state['password'] = password
 
         # Submit button
