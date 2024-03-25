@@ -5,4 +5,5 @@ langchain-community
 faiss-cpu==1.8.0
 awscli
 pypdf
+pytz
 python-dotenv

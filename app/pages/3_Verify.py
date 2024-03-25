@@ -17,21 +17,6 @@ st.markdown(
     unsafe_allow_html = True
 )
 
-# Function to resend the code
-def resend_code(clientID, region_name, username) -> bool:
-    try:
-        client = boto3.client('cognito-idp', region_name = region_name)
-        response = client.resend_confirmation_code(
-            ClientId = clientID,
-            Username = username,
-        )
-        return True
-    except Exception as e:
-        # st.warning(f"Wrong code entered, resending code")
-        # return resend_code(clientID, region_name, username)
-        st.write("Error occured, enter the code")
-        st.switch_page("pages/3_Verify.py")
-
 # Function to verify the code
 def verify_code(client_id, region_name, username, code) -> bool:
     try:
@@ -39,7 +24,7 @@ def verify_code(client_id, region_name, username, code) -> bool:
         response = client.confirm_sign_up(
             ClientId = client_id,
             Username = username,
-            ConfirmationCode = code,
+            ConfirmationCode = code
         )
         st.write(response)
         return True
@@ -51,7 +36,7 @@ def verify_code(client_id, region_name, username, code) -> bool:
         if e == "LimitExceededException":
             st.warning("Too many wrong codes entered, wait for some time!")
         else:
-            st.warning(f"Wrong code entered; Enter the correct code")
+            st.warning(f"Wrong code entered, try again in 5 seconds")
             time.sleep(5)
             st.switch_page("pages/3_Verify.py")
 
@@ -60,16 +45,21 @@ def main():
     dotenv.load_dotenv("/workspace/LEARN_SMART/Secrets/.env")
 
     APP_CLIENT_ID = os.getenv("APP_CLIENT_ID")
-    USER_POOL_ID = os.getenv("USER_POOL_ID")
     USER_POOL_REGION = os.getenv("USER_POOL_REGION")
+
+    st.markdown("""
+    <h4>
+        Enter the verification code sent to your given email
+    </h4>
+    """, 
+    unsafe_allow_html=True)
 
     # Verify the code
     with st.form("Verify-code-form"):
         st.write("Verification Code:")
         code = st.text_input(label="Verification-code", placeholder="XXXXXX", label_visibility="collapsed", type="password")
         if st.form_submit_button("Verify"):
-            # username = st.session_state['username']
-            username = "mkpentapalli2k2@gmail.com"
+            username = st.session_state['username']
             val = verify_code(APP_CLIENT_ID, USER_POOL_REGION, username, code)
             if val:
                 st.success("Successfully signed up!!")
