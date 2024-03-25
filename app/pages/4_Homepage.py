@@ -32,7 +32,6 @@ if 'username' not in st.session_state:
     # st.switch_page("pages/1_Login.py")
 else:
     username = st.session_state['username']
-    # st.write(f"Username: {username}")
 
 
 # Initial setup of the Homepage
@@ -85,7 +84,7 @@ def list_folders_in_bucket(bucket_name, folder_prefix):
 def download_files_from_s3_folder(bucket_name, folder_prefix, local_directory):
     s3 = boto3.client('s3')
     files_list = s3.list_objects_v2(Bucket = bucket_name, Prefix = folder_prefix)
-    st.write(files_list)
+    # st.write(files_list)
     for i in range(1, len(files_list['Contents'])):
         key = files_list['Contents'][i]["Key"]
         local_file_path = os.path.join(local_directory, key.split('/')[-1])
@@ -101,9 +100,8 @@ def append_message(container, role, content):
 
 def get_history():
     with open("/workspace/LEARN_SMART/app/docs/chat.json", "r") as file:
-        data = json.load(file)
-        for message in data:
-            st.session_state.chat_history.append({"role":f"{messages["role"]}", "content":f"{messages["content"]}"})
+        json_data = json.load(file)
+    st.session_state.chat_history = json_data
 
 
 
@@ -113,14 +111,13 @@ def display_chat_history(container):
             container.markdown(message["content"])
 
 
+
 # Specifying the columns for the chat history and current history.
 prev_chats, cur_chat = st.columns(spec = [0.3,0.7], gap="small")
 
 
 
-
 with prev_chats:
-    # st.write(f"users/{username}/")
     if check_folder_exists(bucket_name, f"users/{username}/"):
         st.write("You have previous chats!!")
         folders_list = list_folders_in_bucket(bucket_name, f"users/{username}/")
@@ -141,8 +138,11 @@ with prev_chats:
 
 
 with cur_chat:
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    if st.button("End Chat"):
+        st.write("Ended chat")
+        with open("/workspace/LEARN_SMART/app/docs/chat.json", "w") as file:
+            json.dump(st.session_state.chat_history, file)
+
 
     if prompt := st.chat_input("User prompt: ", max_chars = 500):
         li = []
