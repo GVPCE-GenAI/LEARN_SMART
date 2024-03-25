@@ -80,7 +80,7 @@ def get_claude_llm():
 
 prompt_template = """
 
-Human: Anything that is specified in the square brackets shouldn't be given as a response to the user. Rather, it is only for your own understanding.
+Human: Anything that is specified in the square brackets shouldn't be given as a response to the user. Rather, it is only for your own understanding. Also, you need not display the square brackets in your response, it is only for your understanding.
 Initially, you need to extract all the information and content from the document uploaded by the user. Then, you need to analyse the prompt provided by the user to understand the intent.
 If the document is empty or doesn't contain any information, then give a response that the document doesn't provide any information and ask the user to upload a valid document.
 Be more careful to only respond based on the details provided in the document, and not make assumptions or provide information that is not present. If the information is not present explicitly in the document then say that the document doesn't explicitly specify anything.
