@@ -6,6 +6,7 @@ import pytz
 import boto3
 import dotenv
 import streamlit as st
+from datetime import datetime
 from langchain.llms.bedrock import Bedrock
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
@@ -42,19 +43,22 @@ else:
     username = st.session_state['username']
 
 
-# Initial setup of the Homepage
-st.session_state['use_history'] = False                         
+# Initial setup of the Homepage                    
 dotenv.load_dotenv("/workspace/LEARN_SMART/Secrets/.env")
 bucket_name = os.getenv("S3_BUCKET_NAME")
 docs_path = "/workspace/LEARN_SMART/app/docs/"                  # Make docs directory
 os.makedirs(f"{docs_path}", exist_ok = True)
+with open(f"{docs_path}chat.json", "w") as file:
+    pass
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-upload_folder_name = None
+if "aws_folder_name" not in st.session_state:
+    st.session_state.aws_folder_name = []
 st.session_state.docs = None
+st.session_state.use_history = False
+uploaded_file = False
 bedrock=boto3.client(service_name="bedrock-runtime", region_name = os.getenv("USER_POOL_REGION"))
 bedrock_embeddings = BedrockEmbeddings(model_id = "amazon.titan-embed-text-v1", client = bedrock)
-flag = False
 
 
 
@@ -63,10 +67,10 @@ def get_current_time() -> str:
     try:
         timezone = pytz.timezone('Asia/Kolkata')
         current_time = datetime.now(timezone)
-        return current_time.srftime("%Y-%m-%d_%H:%M:%S")
+        return current_time.strftime("%Y-%m-%d_%H:%M:%S")
     except Exception as e:
-        print("Error occurred when trying to get the current time!!")
-        return "Today"
+        print(f"Error occurred when trying to get the current time!!{e}")
+        return None
 
 
 
@@ -95,7 +99,6 @@ def list_folders_in_bucket(bucket_name, folder_prefix):
 def download_files_from_s3_folder(bucket_name, folder_prefix, local_directory):
     s3 = boto3.client('s3')
     files_list = s3.list_objects_v2(Bucket = bucket_name, Prefix = folder_prefix)
-    # st.write(files_list)
     for i in range(1, len(files_list['Contents'])):
         key = files_list['Contents'][i]["Key"]
         local_file_path = os.path.join(local_directory, key.split('/')[-1])
@@ -117,7 +120,7 @@ def get_history():
 
 
 # Delete all files in a given local directory
-def del_files_in_docs(directory):
+def del_files_in_docs(directory = docs_path):
     for filename in os.listdir(directory):
         file_path = os.path.join(directory, filename)
         if os.path.isfile(file_path):
@@ -137,7 +140,7 @@ def check_pdf_size(directory):
 def data_ingestion(directory):
     loader = PyPDFDirectoryLoader(directory)
     documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size = 10000,
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size = 25000,
                                                     chunk_overlap = 1000)
     docs = text_splitter.split_documents(documents)
     if len(docs) == 0:
@@ -156,7 +159,7 @@ def get_vector_store(directory, docs):
 
 
 def get_claude_llm():
-    llm = BedrockChat(model_id = "anthropic.claude-3-haiku-20240307-v1:0", client = bedrock, model_kwargs = {'max_tokens' : 150000})
+    llm = BedrockChat(model_id = "anthropic.claude-3-haiku-20240307-v1:0", client = bedrock, model_kwargs = {'max_tokens' : 20000})
     return llm
 
 
@@ -212,6 +215,31 @@ def get_response_llm(llm, vectorstore_faiss, query):
 
 
 
+def delete_folder(folder_name):
+    client = boto3.client('s3')
+    paginator = client.get_paginator('list_objects_v2')
+    pages = paginator.paginate(Bucket = bucket_name, Prefix = folder_name)
+    deletion_objects = {'Objects' : []}
+    for page in pages:
+        for item in page.get('Contents', []):
+            deletion_objects['Objects'].append({'Key' : item['Key']})
+        if deletion_objects['Objects']:
+            client.delete_objects(Bucket = bucket_name, Delete = deletion_objects)
+            deletion_objects['Objects'] = []
+    client.delete_object(Bucket = bucket_name, Key = folder_name)
+
+
+
+def upload_folder_to_s3_folder(local_folder_name, folder_path, target_folder_path):
+    client = boto3.client('s3')
+    local_folder_name += '/'
+    client.put_object(Bucket = bucket_name, Key = target_folder_path, Body = "")
+    s3_folder_key = os.path.join(target_folder_path+local_folder_name, os.path.basename(folder_path))
+    for filename in os.listdir(folder_path):
+        s3_object_key = os.path.join(s3_folder_key, filename)
+        upload_file = os.path.join(folder_path, filename)
+        client.upload_file(upload_file, bucket_name, s3_object_key)
+
 
 # Specifying the columns for the chat history and current history.
 prev_chats, cur_chat = st.columns(spec = [0.2,0.8], gap="small")
@@ -219,31 +247,33 @@ prev_chats, cur_chat = st.columns(spec = [0.2,0.8], gap="small")
 
 # Container for previous chats
 with prev_chats:
+    st.header("Previous chats:")
     if check_folder_exists(bucket_name, f"users/{username}/"):
-        st.header("You have previous chats!!")
         folders_list = list_folders_in_bucket(bucket_name, f"users/{username}/")
         folders_list.sort(reverse = True)
+        aws_folder = None
         for folder_name in folders_list:
             if prev_chats.button(f'{folder_name}'):
-                upload_folder_name = folder_name
-                st.session_state.chat_history = []
+                if os.path.isdir(docs_path):
+                    del_files_in_docs()
                 chat_folder = f"users/{username}/{folder_name}/"
+                st.session_state.aws_folder_name.append(chat_folder)
                 download_files_from_s3_folder(bucket_name, chat_folder, docs_path)
-                st.session_state['use_history'] = True
+                st.session_state.use_history = True
                 get_history()
-                flag = True
     else:
-        with open(f"{docs_path}chat.json", "w") as file:
-            pass
-        st.header("You don't have any previous chats!!")
-        st.session_state['use_history'] = False
+        st.header("You have no previous chats.")
 
 
 # Container for current chats
 with cur_chat:
-    st.header("Chat with PDF using Learn Smart :sunglasses:")
-    # chat.get_vector_store(docs_path, docs)
-    if st.session_state['use_history'] == False:
+    st.header("Chat with PDF using Learn Smart :sunglasses:")  
+    if st.session_state.chat_history != []:
+        if uploaded_file == False:
+            st.session_state.use_history = True
+        else:
+            st.session_state.use_history = False
+    elif uploaded_file == False:
         st.write("Upload your pdf file (maximum filesize is 20Mb):")
         uploaded_file = st.file_uploader(label = "Pdf-file", type = 'pdf', help = "Upload only pdf files!", label_visibility = "collapsed")
         css = '''
@@ -268,41 +298,49 @@ with cur_chat:
         if uploaded_file is not None:
             if st.button("Upload PDF"):
                 st.session_state.chat_history = []
-                del_files_in_docs(docs_path)
                 filename = uploaded_file.name
                 with open(os.path.join(docs_path,filename), "wb") as f:
                     f.write(uploaded_file.getvalue())
                 if(check_pdf_size(os.path.join(docs_path,filename))):
                     st.session_state.docs, val = data_ingestion(docs_path)
                     if val == False:
-                        del_files_in_docs(docs_path)
+                        del_files_in_docs()
                         st.warning("File is empty!!!, remove the file and try again!!")
                     else:
-                        flag = True
                         with st.spinner("Processing embeddings...."):
                             get_vector_store(docs_path, st.session_state.docs)
                 else:
-                    del_files_in_docs(docs_path)
+                    del_files_in_docs()
                     st.warning("File size is not within 20MB, remove the file and try again!!")
-    else:
-        st.session_state.docs, val = data_ingestion(docs_path)
-        with st.spinner("Processing embeddings...."):
-            get_vector_store(docs_path, st.session_state.docs)
+        st.session_state.use_history = False
+        uploaded_file = True
+
 
     if st.button("End Chat and Signout"):
+        if st.session_state.chat_history == []:
+            st.switch_page("pages/4_Homepage.py")
         with open(f"{docs_path}chat.json", "w") as file:
             json.dump(st.session_state.chat_history, file)
-        # if st.session_state.use_history == True and upload_folder_name != None:
-        #     # Folder rename from previous to current.
-        #     # Replace the chat.json with new one
-        #     st.session_state.use_history = False
-        # elif st.session_state.use_history == Flase and upload_folder_name == None:
-        #     # Get folder name as current datetime.
-        #     # Create a new empty folder in s3 folder.
-        #     # Upload all files from here to there.
-        st.session_state.username = None
-        docs = None
-        st.switch_page("pages/5_Signout.py")   
+        current_datetime = get_current_time()
+        if st.session_state.use_history == True and st.session_state.aws_folder_name != []:
+            delete_folder(f"{st.session_state.aws_folder_name[-1]}")
+
+        app_folder = "/workspace/LEARN_SMART/app/"
+        new_folder_path = app_folder+f"{current_datetime}/"
+        os.rename(app_folder+"docs/", new_folder_path)
+
+
+        upload_folder_to_s3_folder(current_datetime, new_folder_path, f"users/{username}/")
+        st.warning("You will now be signing out!!")
+        if os.path.isdir(new_folder_path):
+            del_files_in_docs(new_folder_path)
+        time.sleep(3)
+        st.session_state.username = ""
+        st.session_state.chat_history = []
+        st.session_state.aws_folder_name = ""
+        st.session_state.use_history = False
+        st.switch_page("pages/Signout.py") 
+
 
     if prompt := st.chat_input("User prompt: ", max_chars = 500):
         li = []
