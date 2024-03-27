@@ -97,7 +97,6 @@ def list_folders_in_bucket(bucket_name, folder_prefix):
 def download_files_from_s3_folder(bucket_name, folder_prefix, local_directory):
     s3 = boto3.client('s3')
     files_list = s3.list_objects_v2(Bucket = bucket_name, Prefix = folder_prefix)
-    # st.write(files_list)
     for i in range(len(files_list['Contents'])):
         key = files_list['Contents'][i]["Key"]
         local_file_path = os.path.join(local_directory, key.split('/')[-1])
