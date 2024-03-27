@@ -4,6 +4,7 @@ import json
 import time
 import pytz
 import boto3
+import shutil
 import dotenv
 import streamlit as st
 from datetime import datetime
@@ -35,10 +36,9 @@ st.markdown(
 username = None
 
 if 'username' not in st.session_state:
-    username = 'mkpentapalli2k2@gmail.com'
-    # st.header("You need to login again!!")
-    # time.sleep(2)
-    # st.switch_page("pages/1_Login.py")
+    st.header("You need to login again!!")
+    time.sleep(2)
+    st.switch_page("pages/1_Login.py")
 else:
     username = st.session_state['username']
 
@@ -48,8 +48,6 @@ dotenv.load_dotenv("/workspace/LEARN_SMART/Secrets/.env")
 bucket_name = os.getenv("S3_BUCKET_NAME")
 docs_path = "/workspace/LEARN_SMART/app/docs/"                  # Make docs directory
 os.makedirs(f"{docs_path}", exist_ok = True)
-with open(f"{docs_path}chat.json", "w") as file:
-    pass
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "aws_folder_name" not in st.session_state:
@@ -99,7 +97,8 @@ def list_folders_in_bucket(bucket_name, folder_prefix):
 def download_files_from_s3_folder(bucket_name, folder_prefix, local_directory):
     s3 = boto3.client('s3')
     files_list = s3.list_objects_v2(Bucket = bucket_name, Prefix = folder_prefix)
-    for i in range(1, len(files_list['Contents'])):
+    # st.write(files_list)
+    for i in range(len(files_list['Contents'])):
         key = files_list['Contents'][i]["Key"]
         local_file_path = os.path.join(local_directory, key.split('/')[-1])
         s3.download_file(bucket_name, key, local_file_path)
@@ -254,8 +253,6 @@ with prev_chats:
         aws_folder = None
         for folder_name in folders_list:
             if prev_chats.button(f'{folder_name}'):
-                if os.path.isdir(docs_path):
-                    del_files_in_docs()
                 chat_folder = f"users/{username}/{folder_name}/"
                 st.session_state.aws_folder_name.append(chat_folder)
                 download_files_from_s3_folder(bucket_name, chat_folder, docs_path)
@@ -297,6 +294,9 @@ with cur_chat:
         st.markdown(css, unsafe_allow_html = True)
         if uploaded_file is not None:
             if st.button("Upload PDF"):
+                del_files_in_docs()
+                with open(f"{docs_path}chat.json", "w") as file:
+                    pass
                 st.session_state.chat_history = []
                 filename = uploaded_file.name
                 with open(os.path.join(docs_path,filename), "wb") as f:
@@ -318,7 +318,7 @@ with cur_chat:
 
     if st.button("End Chat and Signout"):
         if st.session_state.chat_history == []:
-            st.switch_page("pages/4_Homepage.py")
+            st.switch_page("pages/5_Signout.py")
         with open(f"{docs_path}chat.json", "w") as file:
             json.dump(st.session_state.chat_history, file)
         current_datetime = get_current_time()
@@ -334,12 +334,13 @@ with cur_chat:
         st.warning("You will now be signing out!!")
         if os.path.isdir(new_folder_path):
             del_files_in_docs(new_folder_path)
+            shutil.rmtree(new_folder_path)
         time.sleep(3)
         st.session_state.username = ""
         st.session_state.chat_history = []
-        st.session_state.aws_folder_name = ""
+        st.session_state.aws_folder_name = []
         st.session_state.use_history = False
-        st.switch_page("pages/Signout.py") 
+        st.switch_page("pages/5_Signout.py") 
 
 
     if prompt := st.chat_input("User prompt: ", max_chars = 500):
