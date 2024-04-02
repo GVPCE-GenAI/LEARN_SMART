@@ -18,5 +18,5 @@ st.title("You've been successfully signed out!!")
 if st.button("Login again"):
     st.switch_page("pages/1_Login.py")
 
-if st.button("Sign up for a new account:"):
+if st.button("Sign up for a new account"):
     st.switch_page("pages/2_Signup.py")
